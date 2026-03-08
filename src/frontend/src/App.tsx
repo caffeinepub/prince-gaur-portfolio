@@ -213,32 +213,68 @@ function FilmStripDivider() {
   );
 }
 
-// ─── Sketch Heading (draw-on reveal) ─────────────────────────────────────────
+// ─── Typewriter Heading ───────────────────────────────────────────────────────
 
-function SketchHeading() {
-  const [done, setDone] = useState(false);
+const TYPEWRITER_TEXT = "Hii, I'm Prince Gaur";
 
+function TypewriterHeading() {
+  const [displayed, setDisplayed] = useState("");
+  const [cursorVisible, setCursorVisible] = useState(true);
+  const [typingDone, setTypingDone] = useState(false);
+  const indexRef = useRef(0);
+
+  // Typing effect
   useEffect(() => {
-    const timer = setTimeout(() => setDone(true), 1400);
-    return () => clearTimeout(timer);
+    if (indexRef.current >= TYPEWRITER_TEXT.length) return;
+
+    const type = () => {
+      if (indexRef.current < TYPEWRITER_TEXT.length) {
+        indexRef.current += 1;
+        setDisplayed(TYPEWRITER_TEXT.slice(0, indexRef.current));
+        // Slight random variation for natural feel (64–94ms per character, 10% faster than previous)
+        const delay = 64 + Math.random() * 30;
+        setTimeout(type, delay);
+      } else {
+        setTypingDone(true);
+      }
+    };
+
+    // Small initial delay so page loads first
+    const start = setTimeout(type, 300);
+    return () => clearTimeout(start);
   }, []);
 
+  // Blinking cursor — stops blinking 1.2s after typing finishes
+  useEffect(() => {
+    if (!typingDone) return;
+    const stop = setTimeout(() => setCursorVisible(false), 1200);
+    return () => clearTimeout(stop);
+  }, [typingDone]);
+
   return (
-    <div className="sketch-reveal-container">
-      {/* Glow sweep bar */}
-      <div className="sketch-sweep" aria-hidden="true" />
-      <h1
-        className={`glitch-text sketch-reveal-heading font-display text-[clamp(2.8rem,9vw,8rem)] font-bold tracking-[0.12em] text-foreground leading-tight${done ? " sketch-done" : ""}`}
-        data-text="Hii, I'm Prince Gaur"
-        style={{
-          animation:
-            "sketch-reveal 1.3s cubic-bezier(0.25,0.46,0.45,0.94) both, glitch-flicker 6s 1.5s infinite linear",
-          textShadow: done ? undefined : "0 0 60px oklch(0.72 0.12 78 / 25%)",
-        }}
-      >
-        Hii, I&apos;m Prince Gaur
-      </h1>
-    </div>
+    <h1
+      className="glitch-text font-display text-[clamp(2.8rem,9vw,8rem)] font-bold tracking-[0.04em] text-foreground leading-[1.05]"
+      data-text={TYPEWRITER_TEXT}
+    >
+      {displayed}
+      {cursorVisible && (
+        <span
+          aria-hidden="true"
+          style={{
+            display: "inline-block",
+            width: "3px",
+            height: "0.85em",
+            background: "oklch(0.72 0.12 78)",
+            marginLeft: "3px",
+            verticalAlign: "middle",
+            borderRadius: "1px",
+            animation: typingDone
+              ? "typewriter-cursor 0.6s step-end 3"
+              : "typewriter-cursor 0.7s step-end infinite",
+          }}
+        />
+      )}
+    </h1>
   );
 }
 
@@ -654,23 +690,13 @@ function HeroSection() {
 
       {/* Content */}
       <div className="relative z-[10] text-center px-6 max-w-5xl mx-auto">
-        {/* Pre-title */}
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-gold-dim tracking-[0.4em] text-xs uppercase mb-8 font-body"
-        >
-          Crafting Visual Stories That Moves the World
-        </motion.p>
-
-        {/* Main name — sketch draw-on + glitch */}
+        {/* Main name — typewriter effect */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.35 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <SketchHeading />
+          <TypewriterHeading />
         </motion.div>
 
         {/* Gold line */}
@@ -686,7 +712,7 @@ function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 1.0 }}
-          className="font-body text-lg md:text-2xl text-foreground/80 tracking-[0.2em] uppercase mb-3"
+          className="font-body text-lg md:text-2xl text-foreground/80 tracking-[0.12em] uppercase mb-3"
         >
           A Video Editor and Filmmaker
         </motion.p>
@@ -698,7 +724,7 @@ function HeroSection() {
           transition={{ duration: 0.8, delay: 1.2 }}
           className="font-body text-sm md:text-base text-muted-foreground tracking-wider mb-12"
         >
-          4 Years of Storytelling Through the Lens
+          Crafting Visual Stories That Moves the World
         </motion.p>
 
         {/* CTA */}
@@ -893,13 +919,14 @@ function AboutSection() {
   );
 }
 
-// ─── Video Card (Netflix-style hover preview) ─────────────────────────────────
+// ─── Video Card (Cinematic expand-in-place hover preview) ─────────────────────
 
 interface VideoCardProps {
   video: VideoItem | VideoItemWithCategory;
   displayCategory: string;
   index: number;
   audioEnabled: boolean;
+  onHoverChange?: (hovered: boolean) => void;
 }
 
 function VideoCard({
@@ -907,6 +934,7 @@ function VideoCard({
   displayCategory,
   index,
   audioEnabled,
+  onHoverChange,
 }: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -927,27 +955,41 @@ function VideoCard({
   }, []);
 
   const handleHoverStart = useCallback(() => {
+    const firstHover = !hasBeenHoveredRef.current;
     hasBeenHoveredRef.current = true;
     setIsHovered(true);
-    if (audioEnabled) {
-      // Unmute after a short delay to let the iframe load and autoplay start
-      unmuteTimerRef.current = setTimeout(() => {
-        postYT("unMute");
-        postYT("setVolume", [80]);
-      }, 600);
+    onHoverChange?.(true);
+
+    if (firstHover) {
+      if (audioEnabled) {
+        unmuteTimerRef.current = setTimeout(() => {
+          postYT("unMute");
+          postYT("setVolume", [80]);
+        }, 600);
+      }
+    } else {
+      postYT("seekTo", [0, true]);
+      postYT("playVideo");
+      if (audioEnabled) {
+        unmuteTimerRef.current = setTimeout(() => {
+          postYT("unMute");
+          postYT("setVolume", [80]);
+        }, 400);
+      }
     }
-  }, [postYT, audioEnabled]);
+  }, [postYT, audioEnabled, onHoverChange]);
 
   const handleHoverEnd = useCallback(() => {
     setIsHovered(false);
+    onHoverChange?.(false);
     if (unmuteTimerRef.current) {
       clearTimeout(unmuteTimerRef.current);
       unmuteTimerRef.current = null;
     }
-    // Mute instantly and stop playback
     postYT("mute");
-    postYT("stopVideo");
-  }, [postYT]);
+    postYT("pauseVideo");
+    postYT("seekTo", [0, true]);
+  }, [postYT, onHoverChange]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -959,85 +1001,119 @@ function VideoCard({
   // Keep iframe in DOM once it has been hovered (for instant re-hover)
   const showIframe = isHovered || hasBeenHoveredRef.current;
 
+  // Expand scale: ~60% wider than card = scale 1.55 for regular, 1.4 for shorts
+  const expandScale = video.isShort ? 1.4 : 1.55;
+
   return (
     <motion.div
-      className="gold-card bg-card overflow-hidden group"
+      className="gold-card bg-card overflow-visible group"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
-      whileHover={{ scale: 1.035, y: -4 }}
       onHoverStart={handleHoverStart}
       onHoverEnd={handleHoverEnd}
       data-ocid={`work.item.${index + 1}` as `work.item.${1 | 2 | 3}`}
       style={{
         borderRadius: "4px",
-        boxShadow: isHovered
-          ? "0 0 0 1px oklch(0.72 0.12 78 / 50%), 0 8px 40px oklch(0 0 0 / 70%), 0 0 30px oklch(0.72 0.12 78 / 25%), 0 0 80px oklch(0.72 0.12 78 / 10%)"
-          : "0 4px 20px oklch(0 0 0 / 30%)",
-        transition: "box-shadow 0.35s ease",
+        position: "relative",
+        zIndex: isHovered ? 50 : 1,
+        transition: "z-index 0s",
       }}
     >
-      {/* Video area */}
-      <div
-        className={`video-container${video.isShort ? " shorts" : ""} video-card-wrapper${isHovered ? " is-hovered" : ""}`}
-      >
-        {/* Thumbnail */}
-        <img
-          src={thumbnailUrl}
-          alt={video.title}
-          className="video-thumbnail"
-          loading="lazy"
-        />
-
-        {/* Hover iframe preview — kept in DOM after first hover for instant re-play */}
-        {showIframe && (
-          <iframe
-            ref={iframeRef}
-            className="video-iframe-preview"
-            src={previewSrc}
-            title={`${video.title} preview`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            style={{
-              opacity: isHovered ? 1 : 0,
-              pointerEvents: isHovered ? "auto" : "none",
-            }}
-          />
-        )}
-      </div>
-
-      {/* Card footer */}
-      <div
-        className="px-4 py-3 border-t border-[oklch(0.72_0.12_78/12%)] flex items-center justify-between"
+      {/* Inner wrapper — this is what scales up */}
+      <motion.div
+        animate={isHovered ? { scale: expandScale, y: -8 } : { scale: 1, y: 0 }}
+        transition={{
+          duration: 0.42,
+          ease: [0.25, 0.46, 0.45, 0.94],
+        }}
         style={{
-          background:
-            "linear-gradient(to right, oklch(0.13 0.006 78 / 80%), oklch(0.11 0 0))",
+          borderRadius: "4px",
+          overflow: "hidden",
+          transformOrigin: "center center",
+          boxShadow: isHovered
+            ? "0 0 0 1px oklch(0.72 0.12 78 / 55%), 0 20px 60px oklch(0 0 0 / 85%), 0 0 40px oklch(0.72 0.12 78 / 30%), 0 0 100px oklch(0.72 0.12 78 / 12%)"
+            : "0 4px 20px oklch(0 0 0 / 30%)",
+          transition: "box-shadow 0.35s ease",
+          willChange: "transform",
         }}
       >
-        <div>
-          <p
-            className="font-body text-sm font-medium tracking-wide transition-all duration-300"
-            style={{
-              color: isHovered
-                ? "oklch(0.72 0.12 78)"
-                : "oklch(0.94 0.012 85 / 85%)",
-              transform: isHovered ? "translateY(-2px)" : "translateY(0)",
-            }}
-          >
-            {video.title}
-          </p>
-          <p className="font-body text-xs text-muted-foreground mt-0.5 tracking-[0.2em] uppercase">
-            {displayCategory}
-          </p>
-        </div>
-        {/* Gold arrow indicator on hover */}
-        <span
-          className="text-gold text-lg leading-none transition-opacity duration-300"
-          style={{ opacity: isHovered ? 1 : 0 }}
+        {/* Video area */}
+        <div
+          className={`video-container${video.isShort ? " shorts" : ""} video-card-wrapper${isHovered ? " is-hovered" : ""}`}
         >
-          ›
-        </span>
-      </div>
+          {/* Thumbnail */}
+          <img
+            src={thumbnailUrl}
+            alt={video.title}
+            className="video-thumbnail"
+            loading="lazy"
+          />
+
+          {/* Hover iframe preview — kept in DOM after first hover for instant re-play */}
+          {showIframe && (
+            <iframe
+              ref={iframeRef}
+              className="video-iframe-preview"
+              src={previewSrc}
+              title={`${video.title} preview`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{
+                opacity: isHovered ? 1 : 0,
+                pointerEvents: isHovered ? "auto" : "none",
+              }}
+            />
+          )}
+
+          {/* Cinematic overlay gradient on hover */}
+          {isHovered && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "linear-gradient(to top, oklch(0 0 0 / 60%) 0%, transparent 40%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            />
+          )}
+        </div>
+
+        {/* Card footer */}
+        <div
+          className="px-4 py-3 border-t border-[oklch(0.72_0.12_78/12%)] flex items-center justify-between"
+          style={{
+            background:
+              "linear-gradient(to right, oklch(0.13 0.006 78 / 80%), oklch(0.11 0 0))",
+          }}
+        >
+          <div>
+            <p
+              className="font-body text-sm font-medium tracking-wide transition-all duration-300"
+              style={{
+                color: isHovered
+                  ? "oklch(0.72 0.12 78)"
+                  : "oklch(0.94 0.012 85 / 85%)",
+                transform: isHovered ? "translateY(-2px)" : "translateY(0)",
+              }}
+            >
+              {video.title}
+            </p>
+            <p className="font-body text-xs text-muted-foreground mt-0.5 tracking-[0.2em] uppercase">
+              {displayCategory}
+            </p>
+          </div>
+          {/* Gold arrow indicator on hover */}
+          <span
+            className="text-gold text-lg leading-none transition-opacity duration-300"
+            style={{ opacity: isHovered ? 1 : 0 }}
+          >
+            ›
+          </span>
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
@@ -1046,6 +1122,7 @@ function VideoCard({
 
 function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
   const [activeCategory, setActiveCategory] = useState<WorkCategory>("All");
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const videos =
     activeCategory === "All"
       ? ALL_VIDEOS
@@ -1108,31 +1185,59 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
           ))}
         </div>
 
-        {/* Video grid */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeCategory}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {videos.map((video, i) => (
-              <VideoCard
-                key={`${activeCategory}-${video.embedUrl}-${i}`}
-                video={video}
-                displayCategory={
-                  activeCategory === "All"
-                    ? (video as VideoItemWithCategory).category
-                    : activeCategory
-                }
-                index={i}
-                audioEnabled={audioEnabled}
+        {/* Video grid — relative container for dimming overlay */}
+        <div className="relative">
+          {/* Cinematic dim overlay when any card is hovered */}
+          <AnimatePresence>
+            {hoveredIndex !== null && (
+              <motion.div
+                key="dim-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                  position: "absolute",
+                  inset: "-3rem",
+                  background: "oklch(0 0 0 / 55%)",
+                  backdropFilter: "blur(2px)",
+                  zIndex: 10,
+                  pointerEvents: "none",
+                  borderRadius: "8px",
+                }}
               />
-            ))}
-          </motion.div>
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeCategory}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              style={{ position: "relative" }}
+            >
+              {videos.map((video, i) => (
+                <VideoCard
+                  key={`${activeCategory}-${video.embedUrl}-${i}`}
+                  video={video}
+                  displayCategory={
+                    activeCategory === "All"
+                      ? (video as VideoItemWithCategory).category
+                      : activeCategory
+                  }
+                  index={i}
+                  audioEnabled={audioEnabled}
+                  onHoverChange={(hovered) =>
+                    setHoveredIndex(hovered ? i : null)
+                  }
+                />
+              ))}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </section>
   );
