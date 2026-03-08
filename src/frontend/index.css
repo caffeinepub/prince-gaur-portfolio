@@ -301,8 +301,8 @@
   /* Scroll reveal base */
   .reveal {
     opacity: 0;
-    transform: translateY(32px);
-    transition: opacity 0.7s ease, transform 0.7s ease;
+    transform: translateY(40px);
+    transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
   .reveal.visible {
@@ -438,7 +438,7 @@
   }
 
   .sketch-reveal-heading {
-    animation: sketch-reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: sketch-reveal 1.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
     will-change: clip-path;
   }
 
@@ -459,7 +459,7 @@
     filter: blur(3px);
     pointer-events: none;
     z-index: 20;
-    animation: sketch-glow-sweep 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: sketch-glow-sweep 1.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
     will-change: left, opacity;
   }
 
@@ -486,6 +486,15 @@
   .section-vignette {
     position: relative;
     overflow: hidden;
+  }
+
+  .section-vignette::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, oklch(0 0 0 / 30%) 100%);
+    pointer-events: none;
+    z-index: 1;
   }
 
   /* Letterbox cinema bars — thin lines at top & bottom of hero */
@@ -791,14 +800,22 @@
 
   /* ── Sketch / draw-on keyframes ─────────────────────────────────── */
   @keyframes sketch-reveal {
-    from { clip-path: inset(0 100% 0 0); }
-    to   { clip-path: inset(0 0% 0 0); }
+    0%   { clip-path: inset(0 100% 0 0); opacity: 0.9; }
+    85%  { clip-path: inset(0 2% 0 0); opacity: 1; }
+    100% { clip-path: inset(0 0% 0 0); opacity: 1; }
   }
 
   @keyframes sketch-glow-sweep {
-    0%   { left: -1%; opacity: 1; }
-    85%  { left: 99%; opacity: 1; }
-    100% { left: 105%; opacity: 0; }
+    0%   { left: -2%; opacity: 0; width: 3px; }
+    5%   { opacity: 1; }
+    85%  { left: 98%; opacity: 1; width: 5px; }
+    100% { left: 104%; opacity: 0; width: 2px; }
+  }
+
+  /* Persistent glow after sketch completes */
+  .sketch-reveal-heading.sketch-done {
+    text-shadow: 0 0 80px oklch(0.72 0.12 78 / 20%), 0 0 30px oklch(0.72 0.12 78 / 10%) !important;
+    transition: text-shadow 0.6s ease;
   }
 
   /* ── Arcane ambient blob ────────────────────────────────────────── */
@@ -810,9 +827,11 @@
 
   /* ── Light leak drift ───────────────────────────────────────────── */
   @keyframes light-leak-drift {
-    0%   { background-position: 0% 50%; }
-    50%  { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    0%   { background-position: 0% 50%; opacity: 0.7; }
+    25%  { opacity: 1; }
+    50%  { background-position: 100% 50%; opacity: 0.8; }
+    75%  { opacity: 1; }
+    100% { background-position: 0% 50%; opacity: 0.7; }
   }
 
   /* Aspect ratio for video embeds */

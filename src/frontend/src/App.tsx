@@ -216,17 +216,24 @@ function FilmStripDivider() {
 // ─── Sketch Heading (draw-on reveal) ─────────────────────────────────────────
 
 function SketchHeading() {
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDone(true), 1400);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="sketch-reveal-container">
       {/* Glow sweep bar */}
       <div className="sketch-sweep" aria-hidden="true" />
       <h1
-        className="glitch-text sketch-reveal-heading font-display text-[clamp(2.8rem,9vw,8rem)] font-bold tracking-[0.12em] text-foreground leading-tight"
+        className={`glitch-text sketch-reveal-heading font-display text-[clamp(2.8rem,9vw,8rem)] font-bold tracking-[0.12em] text-foreground leading-tight${done ? " sketch-done" : ""}`}
         data-text="Hii, I'm Prince Gaur"
         style={{
           animation:
-            "sketch-reveal 1.2s cubic-bezier(0.16,1,0.3,1) both, glitch-flicker 6s 1.5s infinite linear",
-          textShadow: "0 0 60px oklch(0.72 0.12 78 / 25%)",
+            "sketch-reveal 1.3s cubic-bezier(0.25,0.46,0.45,0.94) both, glitch-flicker 6s 1.5s infinite linear",
+          textShadow: done ? undefined : "0 0 60px oklch(0.72 0.12 78 / 25%)",
         }}
       >
         Hii, I&apos;m Prince Gaur
@@ -260,7 +267,7 @@ function ProjectorBeam() {
 
 // ─── Cinematic Background ─────────────────────────────────────────────────────
 
-const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
+const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
   id: i,
   left: `${(i * 7.3 + 3) % 100}%`,
   size: i % 3 === 0 ? 3 : 2,
@@ -347,6 +354,40 @@ function CinematicBackground() {
             borderRadius: "50%",
             background:
               "radial-gradient(ellipse, oklch(0.72 0.12 78 / 4%) 0%, transparent 70%)",
+          }}
+        />
+
+        {/* Top-right cold blue accent */}
+        <div
+          style={{
+            position: "absolute",
+            top: "-5%",
+            right: "-10%",
+            width: "50vw",
+            height: "45vh",
+            background:
+              "radial-gradient(ellipse at center, oklch(0.55 0.18 270 / 2.5%) 0%, transparent 70%)",
+            borderRadius: "50%",
+            animation: "arcane-blob 24s ease-in-out infinite",
+            animationDelay: "6s",
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* Bottom-center warm amber drift */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "5%",
+            left: "30%",
+            width: "40vw",
+            height: "35vh",
+            background:
+              "radial-gradient(ellipse at center, oklch(0.65 0.14 60 / 1.5%) 0%, transparent 70%)",
+            borderRadius: "50%",
+            animation: "arcane-blob 28s ease-in-out infinite reverse",
+            animationDelay: "12s",
+            pointerEvents: "none",
           }}
         />
 
@@ -810,7 +851,7 @@ function AboutSection() {
                   initial={{ opacity: 0, x: 30 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: i * 0.15 }}
+                  transition={{ duration: 0.7, delay: i * 0.2 }}
                 >
                   <div className="flex items-baseline gap-4">
                     <span className="font-display text-5xl font-bold text-gold">
@@ -864,6 +905,7 @@ function VideoCard({ video, displayCategory, index }: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasBeenHoveredRef = useRef(false);
   const videoId = extractVideoId(video.embedUrl);
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
@@ -879,12 +921,13 @@ function VideoCard({ video, displayCategory, index }: VideoCardProps) {
   }, []);
 
   const handleHoverStart = useCallback(() => {
+    hasBeenHoveredRef.current = true;
     setIsHovered(true);
     // Unmute after a short delay to let the iframe load and autoplay start
     unmuteTimerRef.current = setTimeout(() => {
       postYT("unMute");
       postYT("setVolume", [80]);
-    }, 800);
+    }, 600);
   }, [postYT]);
 
   const handleHoverEnd = useCallback(() => {
@@ -905,21 +948,24 @@ function VideoCard({ video, displayCategory, index }: VideoCardProps) {
     };
   }, []);
 
+  // Keep iframe in DOM once it has been hovered (for instant re-hover)
+  const showIframe = isHovered || hasBeenHoveredRef.current;
+
   return (
     <motion.div
       className="gold-card bg-card overflow-hidden group"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.08 }}
-      whileHover={{ scale: 1.03 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      whileHover={{ scale: 1.035, y: -4 }}
       onHoverStart={handleHoverStart}
       onHoverEnd={handleHoverEnd}
       data-ocid={`work.item.${index + 1}` as `work.item.${1 | 2 | 3}`}
       style={{
         borderRadius: "4px",
         boxShadow: isHovered
-          ? "0 0 20px oklch(0.72 0.12 78 / 30%), 0 0 0 1px oklch(0.72 0.12 78 / 40%)"
-          : undefined,
+          ? "0 0 0 1px oklch(0.72 0.12 78 / 50%), 0 8px 40px oklch(0 0 0 / 70%), 0 0 30px oklch(0.72 0.12 78 / 25%), 0 0 80px oklch(0.72 0.12 78 / 10%)"
+          : "0 4px 20px oklch(0 0 0 / 30%)",
         transition: "box-shadow 0.35s ease",
       }}
     >
@@ -935,8 +981,8 @@ function VideoCard({ video, displayCategory, index }: VideoCardProps) {
           loading="lazy"
         />
 
-        {/* Hover iframe preview — always mounted when hovered, unmuted via postMessage */}
-        {isHovered && (
+        {/* Hover iframe preview — kept in DOM after first hover for instant re-play */}
+        {showIframe && (
           <iframe
             ref={iframeRef}
             className="video-iframe-preview"
@@ -944,6 +990,10 @@ function VideoCard({ video, displayCategory, index }: VideoCardProps) {
             title={`${video.title} preview`}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
+            style={{
+              opacity: isHovered ? 1 : 0,
+              pointerEvents: isHovered ? "auto" : "none",
+            }}
           />
         )}
       </div>
@@ -1057,7 +1107,7 @@ function WorkSection() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.35 }}
+            transition={{ duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
             {videos.map((video, i) => (
@@ -1126,7 +1176,7 @@ function TestimonialsSection() {
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.15 }}
+              transition={{ duration: 0.7, delay: i * 0.2 }}
               data-ocid={
                 `testimonials.item.${i + 1}` as `testimonials.item.${1 | 2 | 3}`
               }
@@ -1473,6 +1523,22 @@ function Footer() {
 
 export default function App() {
   useScrollReveal();
+
+  // Autoplay primer: on first mousemove, dispatch a synthetic click to satisfy
+  // browser autoplay policy — enables hover video to play without user clicking first
+  useEffect(() => {
+    let fired = false;
+    const prime = () => {
+      if (fired) return;
+      fired = true;
+      document.documentElement.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+      window.removeEventListener("mousemove", prime);
+    };
+    window.addEventListener("mousemove", prime, { passive: true });
+    return () => window.removeEventListener("mousemove", prime);
+  }, []);
 
   return (
     <>
