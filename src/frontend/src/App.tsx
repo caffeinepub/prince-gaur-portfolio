@@ -661,7 +661,7 @@ function HeroSection() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-gold-dim tracking-[0.4em] text-xs uppercase mb-8 font-body"
         >
-          Video Editor & Filmmaker
+          Crafting Visual Stories That Moves the World
         </motion.p>
 
         {/* Main name — sketch draw-on + glitch */}
@@ -688,7 +688,7 @@ function HeroSection() {
           transition={{ duration: 0.8, delay: 1.0 }}
           className="font-body text-lg md:text-2xl text-foreground/80 tracking-[0.2em] uppercase mb-3"
         >
-          Crafting Visual Stories That Move the World
+          A Video Editor and Filmmaker
         </motion.p>
 
         {/* Tagline */}
@@ -899,9 +899,15 @@ interface VideoCardProps {
   video: VideoItem | VideoItemWithCategory;
   displayCategory: string;
   index: number;
+  audioEnabled: boolean;
 }
 
-function VideoCard({ video, displayCategory, index }: VideoCardProps) {
+function VideoCard({
+  video,
+  displayCategory,
+  index,
+  audioEnabled,
+}: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -923,12 +929,14 @@ function VideoCard({ video, displayCategory, index }: VideoCardProps) {
   const handleHoverStart = useCallback(() => {
     hasBeenHoveredRef.current = true;
     setIsHovered(true);
-    // Unmute after a short delay to let the iframe load and autoplay start
-    unmuteTimerRef.current = setTimeout(() => {
-      postYT("unMute");
-      postYT("setVolume", [80]);
-    }, 600);
-  }, [postYT]);
+    if (audioEnabled) {
+      // Unmute after a short delay to let the iframe load and autoplay start
+      unmuteTimerRef.current = setTimeout(() => {
+        postYT("unMute");
+        postYT("setVolume", [80]);
+      }, 600);
+    }
+  }, [postYT, audioEnabled]);
 
   const handleHoverEnd = useCallback(() => {
     setIsHovered(false);
@@ -1036,7 +1044,7 @@ function VideoCard({ video, displayCategory, index }: VideoCardProps) {
 
 // ─── Work Section ────────────────────────────────────────────────────────────
 
-function WorkSection() {
+function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
   const [activeCategory, setActiveCategory] = useState<WorkCategory>("All");
   const videos =
     activeCategory === "All"
@@ -1120,6 +1128,7 @@ function WorkSection() {
                     : activeCategory
                 }
                 index={i}
+                audioEnabled={audioEnabled}
               />
             ))}
           </motion.div>
@@ -1523,21 +1532,17 @@ function Footer() {
 
 export default function App() {
   useScrollReveal();
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [showAudioPrompt, setShowAudioPrompt] = useState(true);
 
-  // Autoplay primer: on first mousemove, dispatch a synthetic click to satisfy
-  // browser autoplay policy — enables hover video to play without user clicking first
+  // On first real click anywhere, mark audio as enabled and hide the prompt
   useEffect(() => {
-    let fired = false;
-    const prime = () => {
-      if (fired) return;
-      fired = true;
-      document.documentElement.dispatchEvent(
-        new MouseEvent("click", { bubbles: true }),
-      );
-      window.removeEventListener("mousemove", prime);
+    const enableAudio = () => {
+      setAudioEnabled(true);
+      setShowAudioPrompt(false);
     };
-    window.addEventListener("mousemove", prime, { passive: true });
-    return () => window.removeEventListener("mousemove", prime);
+    window.addEventListener("click", enableAudio, { once: true });
+    return () => window.removeEventListener("click", enableAudio);
   }, []);
 
   return (
@@ -1545,6 +1550,57 @@ export default function App() {
       <CinematicBackground />
       <CustomCursor />
       <Toaster position="bottom-right" />
+
+      {/* One-time audio enable prompt */}
+      <AnimatePresence>
+        {showAudioPrompt && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.5, delay: 1.5 }}
+            style={{
+              position: "fixed",
+              bottom: "2rem",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 9999,
+              pointerEvents: "none",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.5rem 1.25rem",
+                background: "oklch(0.1 0 0 / 85%)",
+                border: "1px solid oklch(0.72 0.12 78 / 30%)",
+                backdropFilter: "blur(12px)",
+                borderRadius: "2px",
+                color: "oklch(0.72 0.12 78 / 75%)",
+                fontFamily: "var(--font-body, sans-serif)",
+                fontSize: "0.7rem",
+                letterSpacing: "0.25em",
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: "oklch(0.72 0.12 78)",
+                  animation: "grain 1s steps(1) infinite",
+                  flexShrink: 0,
+                }}
+              />
+              Click anywhere to enable audio
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Sticky nav */}
       <Navigation />
@@ -1556,7 +1612,7 @@ export default function App() {
         <AboutSection />
 
         <FilmStripDivider />
-        <WorkSection />
+        <WorkSection audioEnabled={audioEnabled} />
 
         <FilmStripDivider />
         <TestimonialsSection />
