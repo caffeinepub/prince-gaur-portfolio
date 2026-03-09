@@ -977,8 +977,11 @@ function VideoCard({
   const videoId = extractVideoId(video.embedUrl);
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
-  // Iframe src — always muted initially, unmuted via postMessage after hover
+  // Desktop iframe src — always muted, unmuted via postMessage after hover
   const previewSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
+  // Mobile unmuted src — loaded synchronously inside user gesture so iOS Safari allows audio
+  const mobileUnmutedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
+  const mobileResetSrc = `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
 
   // Send YouTube IFrame API command via postMessage
   const postYT = useCallback((command: string, args: unknown[] = []) => {
@@ -1029,17 +1032,21 @@ function VideoCard({
   }, [postYT, onHoverChange]);
 
   // ── Mobile: tap-to-play handler ─────────────────────────────────
+  // IMPORTANT: iframe src must be set synchronously inside the user gesture
+  // so that iOS Safari allows audio. postMessage/unMute will NOT work
+  // because the user gesture chain breaks across async React re-renders.
   const handleMobilePlay = useCallback(() => {
     if (isPointerDevice) return;
-    // Pause all other mobile-playing videos via a custom event
+    // Dispatch pause event so all other cards reset synchronously
     window.dispatchEvent(
       new CustomEvent("mobile-pause-all", { detail: { except: videoId } }),
     );
+    // Synchronously reload iframe with mute=0 inside user gesture — iOS Safari requires this
+    if (iframeRef.current) {
+      iframeRef.current.src = mobileUnmutedSrc;
+    }
     setIsMobilePlaying(true);
-    postYT("playVideo");
-    postYT("unMute");
-    postYT("setVolume", [80]);
-  }, [postYT, videoId]);
+  }, [videoId, mobileUnmutedSrc]);
 
   // Listen for pause-all events (stop this card if another starts)
   useEffect(() => {
@@ -1047,31 +1054,54 @@ function VideoCard({
     const onPauseAll = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.except !== videoId) {
+        if (iframeRef.current) {
+          iframeRef.current.src = mobileResetSrc;
+        }
         setIsMobilePlaying(false);
-        postYT("pauseVideo");
-        postYT("seekTo", [0, true]);
-        postYT("mute");
       }
     };
     window.addEventListener("mobile-pause-all", onPauseAll);
     return () => window.removeEventListener("mobile-pause-all", onPauseAll);
-  }, [postYT, videoId]);
+  }, [videoId, mobileResetSrc]);
 
   // ── Pause on tab hidden ───────────────────────────────────────────
   useEffect(() => {
     const onVisibility = () => {
       if (document.hidden) {
-        postYT("pauseVideo");
-        if (!isPointerDevice) {
+        if (isPointerDevice) {
+          postYT("pauseVideo");
+        } else {
+          if (iframeRef.current) {
+            iframeRef.current.src = mobileResetSrc;
+          }
           setIsMobilePlaying(false);
-          postYT("seekTo", [0, true]);
-          postYT("mute");
         }
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [postYT]);
+  }, [postYT, mobileResetSrc]);
+
+  // ── Reset on outside tap ─────────────────────────────────────────
+  useEffect(() => {
+    if (isPointerDevice) return;
+    const onOutsideTap = (e: MouseEvent | TouchEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        if (isMobilePlaying) {
+          if (iframeRef.current) {
+            iframeRef.current.src = mobileResetSrc;
+          }
+          setIsMobilePlaying(false);
+        }
+      }
+    };
+    document.addEventListener("click", onOutsideTap);
+    document.addEventListener("touchend", onOutsideTap);
+    return () => {
+      document.removeEventListener("click", onOutsideTap);
+      document.removeEventListener("touchend", onOutsideTap);
+    };
+  }, [isMobilePlaying, mobileResetSrc]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1080,11 +1110,11 @@ function VideoCard({
     };
   }, []);
 
-  // Keep iframe in DOM once it has been hovered (for instant re-hover on desktop)
-  // On mobile, only mount iframe when the play button has been tapped
+  // Desktop: keep iframe in DOM once hovered for instant re-hover
+  // Mobile: always keep iframe in DOM (src="" initially), set src synchronously on tap
   const showIframe = isPointerDevice
     ? isHovered || hasBeenHoveredRef.current
-    : isMobilePlaying;
+    : true;
 
   return (
     <motion.div
@@ -1135,10 +1165,10 @@ function VideoCard({
           <iframe
             ref={iframeRef}
             className="video-iframe-preview"
-            src={previewSrc}
+            src={isPointerDevice ? previewSrc : undefined}
             title={`${video.title} preview`}
             frameBorder={0}
-            allow="autoplay; encrypted-media; accelerometer; clipboard-write; gyroscope; picture-in-picture"
+            allow="autoplay; encrypted-media; accelerometer; clipboard-write; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
             loading="lazy"
             style={{
