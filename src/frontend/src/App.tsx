@@ -482,6 +482,15 @@ function CustomCursor() {
   const isHovering = useRef(false);
 
   useEffect(() => {
+    // Hide cursor on touch/mobile devices — no custom cursor needed there
+    const isTouchDevice =
+      "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    if (isTouchDevice) {
+      if (dotRef.current) dotRef.current.style.display = "none";
+      if (ringRef.current) ringRef.current.style.display = "none";
+      return;
+    }
+
     const onMouseMove = (e: MouseEvent) => {
       mousePos.current = { x: e.clientX, y: e.clientY };
     };
@@ -509,16 +518,15 @@ function CustomCursor() {
       const dot = dotRef.current;
       const ring = ringRef.current;
 
+      // Use transform: translate() — GPU-accelerated, zero layout repaints
       if (dot) {
-        dot.style.left = `${mousePos.current.x}px`;
-        dot.style.top = `${mousePos.current.y}px`;
+        dot.style.transform = `translate(${mousePos.current.x - 4}px, ${mousePos.current.y - 4}px)`;
       }
 
       if (ring) {
-        ringPos.current.x += (mousePos.current.x - ringPos.current.x) * 0.15;
-        ringPos.current.y += (mousePos.current.y - ringPos.current.y) * 0.15;
-        ring.style.left = `${ringPos.current.x}px`;
-        ring.style.top = `${ringPos.current.y}px`;
+        ringPos.current.x += (mousePos.current.x - ringPos.current.x) * 0.18;
+        ringPos.current.y += (mousePos.current.y - ringPos.current.y) * 0.18;
+        ring.style.transform = `translate(${ringPos.current.x - 18}px, ${ringPos.current.y - 18}px)`;
       }
 
       rafRef.current = requestAnimationFrame(animate);
@@ -527,6 +535,7 @@ function CustomCursor() {
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseover", onMouseOver);
     window.addEventListener("mouseout", onMouseOut);
+    cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(animate);
 
     return () => {
@@ -936,7 +945,7 @@ function AboutSection() {
   );
 }
 
-// ─── Video Card (Desktop: zoom-out hover preview | Mobile: scroll IntersectionObserver) ──
+// ─── Video Card (Desktop: zoom-out hover preview | Mobile: tap-to-play) ──
 
 interface VideoCardProps {
   video: VideoItem | VideoItemWithCategory;
@@ -960,6 +969,7 @@ function VideoCard({
   onHoverChange,
 }: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isMobilePlaying, setIsMobilePlaying] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1018,35 +1028,45 @@ function VideoCard({
     postYT("seekTo", [0, true]);
   }, [postYT, onHoverChange]);
 
-  // ── Mobile: IntersectionObserver scroll-play ──────────────────────
-  useEffect(() => {
-    if (isPointerDevice) return; // desktop uses hover, not observer
-    const card = cardRef.current;
-    if (!card) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            postYT("playVideo");
-          } else {
-            postYT("pauseVideo");
-            postYT("seekTo", [0, true]);
-          }
-        }
-      },
-      { threshold: 0.5 },
+  // ── Mobile: tap-to-play handler ─────────────────────────────────
+  const handleMobilePlay = useCallback(() => {
+    if (isPointerDevice) return;
+    // Pause all other mobile-playing videos via a custom event
+    window.dispatchEvent(
+      new CustomEvent("mobile-pause-all", { detail: { except: videoId } }),
     );
+    setIsMobilePlaying(true);
+    postYT("playVideo");
+    postYT("unMute");
+    postYT("setVolume", [80]);
+  }, [postYT, videoId]);
 
-    observer.observe(card);
-    return () => observer.disconnect();
-  }, [postYT]);
+  // Listen for pause-all events (stop this card if another starts)
+  useEffect(() => {
+    if (isPointerDevice) return;
+    const onPauseAll = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.except !== videoId) {
+        setIsMobilePlaying(false);
+        postYT("pauseVideo");
+        postYT("seekTo", [0, true]);
+        postYT("mute");
+      }
+    };
+    window.addEventListener("mobile-pause-all", onPauseAll);
+    return () => window.removeEventListener("mobile-pause-all", onPauseAll);
+  }, [postYT, videoId]);
 
   // ── Pause on tab hidden ───────────────────────────────────────────
   useEffect(() => {
     const onVisibility = () => {
       if (document.hidden) {
         postYT("pauseVideo");
+        if (!isPointerDevice) {
+          setIsMobilePlaying(false);
+          postYT("seekTo", [0, true]);
+          postYT("mute");
+        }
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
@@ -1061,8 +1081,10 @@ function VideoCard({
   }, []);
 
   // Keep iframe in DOM once it has been hovered (for instant re-hover on desktop)
-  // On mobile, always show iframe so IntersectionObserver can control it
-  const showIframe = !isPointerDevice || isHovered || hasBeenHoveredRef.current;
+  // On mobile, only mount iframe when the play button has been tapped
+  const showIframe = isPointerDevice
+    ? isHovered || hasBeenHoveredRef.current
+    : isMobilePlaying;
 
   return (
     <motion.div
@@ -1120,11 +1142,23 @@ function VideoCard({
             allowFullScreen
             loading="lazy"
             style={{
-              opacity: isHovered || !isPointerDevice ? 1 : 0,
+              opacity: isHovered || isMobilePlaying ? 1 : 0,
               pointerEvents: "none",
               transition: "opacity 0.35s ease",
             }}
           />
+        )}
+
+        {/* Mobile tap-to-play button — hidden on desktop via CSS */}
+        {!isPointerDevice && !isMobilePlaying && (
+          <button
+            type="button"
+            className="mobile-play-button"
+            onClick={handleMobilePlay}
+            aria-label={`Play ${video.title}`}
+          >
+            <span className="mobile-play-icon">&#9654;</span>
+          </button>
         )}
       </div>
 

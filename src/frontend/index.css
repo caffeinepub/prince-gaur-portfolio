@@ -93,13 +93,21 @@
     overflow-x: hidden;
   }
 
-  /* Hide default cursor globally */
-  * {
-    cursor: none !important;
+  /* Hide default cursor on desktop — custom cursor replaces it */
+  @media (min-width: 769px) {
+    * {
+      cursor: none !important;
+    }
+    a, button, [role="button"] {
+      cursor: none !important;
+    }
   }
 
-  a, button, [role="button"] {
-    cursor: none !important;
+  /* Restore default cursor on mobile/touch */
+  @media (max-width: 768px) {
+    * {
+      cursor: auto !important;
+    }
   }
 }
 
@@ -115,7 +123,10 @@
     border-radius: 50%;
     pointer-events: none;
     z-index: 99999;
-    transform: translate(-50%, -50%);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
     transition: width 0.2s, height 0.2s, opacity 0.2s;
     box-shadow: 0 0 12px oklch(0.72 0.12 78 / 80%);
   }
@@ -130,14 +141,33 @@
     border-radius: 50%;
     pointer-events: none;
     z-index: 99998;
-    transform: translate(-50%, -50%);
-    transition: transform 0.12s ease-out, width 0.2s, height 0.2s, opacity 0.2s;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    transition: width 0.2s, height 0.2s, opacity 0.2s;
   }
 
   .cursor-ring.hovering {
     width: 54px;
     height: 54px;
     border-color: oklch(0.72 0.12 78 / 80%);
+  }
+
+  @media (max-width: 768px) {
+    .cursor-dot,
+    .cursor-ring {
+      display: none !important;
+      visibility: hidden !important;
+    }
+  }
+
+  @media (hover: none), (pointer: coarse) {
+    .cursor-dot,
+    .cursor-ring {
+      display: none !important;
+      visibility: hidden !important;
+    }
   }
 
   /* Film grain overlay — two-layer: static noise + animated drift */
@@ -277,6 +307,52 @@
       opacity: 1 !important;
       width: 100%;
       height: 100%;
+    }
+  }
+
+  /* ── Mobile tap-to-play button ──────────────────────────────────── */
+  .mobile-play-button {
+    display: none; /* hidden by default — shown only on touch devices via JS */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background-color: rgba(201, 168, 76, 0.82);
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+    box-shadow: 0 0 24px rgba(201, 168, 76, 0.4);
+  }
+
+  .mobile-play-button:active {
+    transform: translate(-50%, -50%) scale(0.88);
+    background-color: rgba(201, 168, 76, 1);
+  }
+
+  .mobile-play-icon {
+    color: white;
+    font-size: 26px;
+    margin-left: 5px;
+    line-height: 1;
+  }
+
+  /* Show only on touch/non-pointer devices */
+  @media (hover: none), (pointer: coarse) {
+    .mobile-play-button {
+      display: flex !important;
+    }
+  }
+
+  /* Explicitly hide on desktop pointer devices */
+  @media (hover: hover) and (pointer: fine) {
+    .mobile-play-button {
+      display: none !important;
     }
   }
 
