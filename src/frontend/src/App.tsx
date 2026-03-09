@@ -953,6 +953,7 @@ interface VideoCardProps {
   index: number;
   audioEnabled: boolean;
   onHoverChange?: (hovered: boolean) => void;
+  onMobileTap?: (videoId: string, title: string, isPortrait: boolean) => void;
 }
 
 // Detect pointer device once (desktop = hover:hover + pointer:fine)
@@ -967,9 +968,9 @@ function VideoCard({
   index,
   audioEnabled,
   onHoverChange,
+  onMobileTap,
 }: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isMobilePlaying, setIsMobilePlaying] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -977,13 +978,8 @@ function VideoCard({
   const videoId = extractVideoId(video.embedUrl);
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
-  // Desktop iframe src — always muted, unmuted via postMessage after hover
   const previewSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
-  // Mobile unmuted src — loaded synchronously inside user gesture so iOS Safari allows audio
-  const mobileUnmutedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
-  const mobileResetSrc = `https://www.youtube.com/embed/${videoId}?autoplay=0&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
 
-  // Send YouTube IFrame API command via postMessage
   const postYT = useCallback((command: string, args: unknown[] = []) => {
     iframeRef.current?.contentWindow?.postMessage(
       JSON.stringify({ event: "command", func: command, args }),
@@ -991,14 +987,12 @@ function VideoCard({
     );
   }, []);
 
-  // ── Desktop hover handlers (pointer devices only) ─────────────────
   const handleHoverStart = useCallback(() => {
     if (!isPointerDevice) return;
     const firstHover = !hasBeenHoveredRef.current;
     hasBeenHoveredRef.current = true;
     setIsHovered(true);
     onHoverChange?.(true);
-
     if (firstHover) {
       if (audioEnabled) {
         unmuteTimerRef.current = setTimeout(() => {
@@ -1031,90 +1025,25 @@ function VideoCard({
     postYT("seekTo", [0, true]);
   }, [postYT, onHoverChange]);
 
-  // ── Mobile: tap-to-play handler ─────────────────────────────────
-  // IMPORTANT: iframe src must be set synchronously inside the user gesture
-  // so that iOS Safari allows audio. postMessage/unMute will NOT work
-  // because the user gesture chain breaks across async React re-renders.
-  const handleMobilePlay = useCallback(() => {
-    if (isPointerDevice) return;
-    // Dispatch pause event so all other cards reset synchronously
-    window.dispatchEvent(
-      new CustomEvent("mobile-pause-all", { detail: { except: videoId } }),
-    );
-    // Synchronously reload iframe with mute=0 inside user gesture — iOS Safari requires this
-    if (iframeRef.current) {
-      iframeRef.current.src = mobileUnmutedSrc;
-    }
-    setIsMobilePlaying(true);
-  }, [videoId, mobileUnmutedSrc]);
-
-  // Listen for pause-all events (stop this card if another starts)
-  useEffect(() => {
-    if (isPointerDevice) return;
-    const onPauseAll = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.except !== videoId) {
-        if (iframeRef.current) {
-          iframeRef.current.src = mobileResetSrc;
-        }
-        setIsMobilePlaying(false);
-      }
-    };
-    window.addEventListener("mobile-pause-all", onPauseAll);
-    return () => window.removeEventListener("mobile-pause-all", onPauseAll);
-  }, [videoId, mobileResetSrc]);
-
-  // ── Pause on tab hidden ───────────────────────────────────────────
   useEffect(() => {
     const onVisibility = () => {
-      if (document.hidden) {
-        if (isPointerDevice) {
-          postYT("pauseVideo");
-        } else {
-          if (iframeRef.current) {
-            iframeRef.current.src = mobileResetSrc;
-          }
-          setIsMobilePlaying(false);
-        }
+      if (document.hidden && isPointerDevice) {
+        postYT("pauseVideo");
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [postYT, mobileResetSrc]);
+  }, [postYT]);
 
-  // ── Reset on outside tap ─────────────────────────────────────────
-  useEffect(() => {
-    if (isPointerDevice) return;
-    const onOutsideTap = (e: MouseEvent | TouchEvent) => {
-      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
-        if (isMobilePlaying) {
-          if (iframeRef.current) {
-            iframeRef.current.src = mobileResetSrc;
-          }
-          setIsMobilePlaying(false);
-        }
-      }
-    };
-    document.addEventListener("click", onOutsideTap);
-    document.addEventListener("touchend", onOutsideTap);
-    return () => {
-      document.removeEventListener("click", onOutsideTap);
-      document.removeEventListener("touchend", onOutsideTap);
-    };
-  }, [isMobilePlaying, mobileResetSrc]);
-
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (unmuteTimerRef.current) clearTimeout(unmuteTimerRef.current);
     };
   }, []);
 
-  // Desktop: keep iframe in DOM once hovered for instant re-hover
-  // Mobile: always keep iframe in DOM (src="" initially), set src synchronously on tap
   const showIframe = isPointerDevice
     ? isHovered || hasBeenHoveredRef.current
-    : true;
+    : false;
 
   return (
     <motion.div
@@ -1125,6 +1054,11 @@ function VideoCard({
       transition={{ duration: 0.5, delay: index * 0.1 }}
       onHoverStart={handleHoverStart}
       onHoverEnd={handleHoverEnd}
+      onClick={() => {
+        if (!isPointerDevice) {
+          onMobileTap?.(videoId, video.title, video.isShort === true);
+        }
+      }}
       data-ocid={`work.item.${index + 1}` as `work.item.${1 | 2 | 3}`}
       style={{
         borderRadius: "4px",
@@ -1133,19 +1067,15 @@ function VideoCard({
         willChange: "transform",
       }}
     >
-      {/* Video area */}
       <div
         className={`video-container${video.isShort ? " shorts" : ""} video-card-wrapper${isHovered ? " is-hovered" : ""}`}
       >
-        {/* Thumbnail */}
         <img
           src={thumbnailUrl}
           alt={video.title}
           className="video-thumbnail"
           loading="lazy"
         />
-
-        {/* Card overlay — visible on mobile (0.4), fades on desktop hover */}
         <div
           className="card-overlay"
           style={{
@@ -1159,40 +1089,30 @@ function VideoCard({
             transition: "opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
           }}
         />
-
-        {/* iframe preview */}
         {showIframe && (
           <iframe
             ref={iframeRef}
             className="video-iframe-preview"
-            src={isPointerDevice ? previewSrc : undefined}
+            src={previewSrc}
             title={`${video.title} preview`}
             frameBorder={0}
             allow="autoplay; encrypted-media; accelerometer; clipboard-write; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
             loading="lazy"
             style={{
-              opacity: isHovered || isMobilePlaying ? 1 : 0,
+              opacity: isHovered ? 1 : 0,
               pointerEvents: "none",
               transition: "opacity 0.35s ease",
             }}
           />
         )}
-
-        {/* Mobile tap-to-play button — hidden on desktop via CSS */}
-        {!isPointerDevice && !isMobilePlaying && (
-          <button
-            type="button"
-            className="mobile-play-button"
-            onClick={handleMobilePlay}
-            aria-label={`Play ${video.title}`}
-          >
-            <span className="mobile-play-icon">&#9654;</span>
-          </button>
+        {!isPointerDevice && (
+          <div className="mobile-tap-indicator">
+            <div className="tap-icon">&#9654;</div>
+            <span className="tap-label">Tap to Watch</span>
+          </div>
         )}
       </div>
-
-      {/* Card footer */}
       <div
         className="px-4 py-3 border-t border-[oklch(0.72_0.12_78/12%)] flex items-center justify-between"
         style={{
@@ -1216,7 +1136,6 @@ function VideoCard({
             {displayCategory}
           </p>
         </div>
-        {/* Gold arrow indicator on hover */}
         <span
           className="text-gold text-lg leading-none transition-opacity duration-300"
           style={{ opacity: isHovered ? 1 : 0 }}
@@ -1228,22 +1147,106 @@ function VideoCard({
   );
 }
 
+// ─── Video Modal (Mobile only) ────────────────────────────────────────────────
+
+interface VideoModalProps {
+  videoId: string;
+  title: string;
+  isPortrait: boolean;
+  onClose: () => void;
+}
+
+function VideoModal({ videoId, title, isPortrait, onClose }: VideoModalProps) {
+  const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&controls=1&playsinline=1&playlist=${videoId}&enablejsapi=1&rel=0`;
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => onClose();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [onClose]);
+
+  return (
+    <div
+      className="video-modal-overlay active"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyUp={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+      onTouchEnd={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+    >
+      <div className="video-modal-container">
+        <button
+          type="button"
+          className="video-modal-close"
+          onClick={onClose}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            onClose();
+          }}
+          aria-label="Close video"
+          data-ocid="work.modal.close_button"
+        >
+          ✕
+        </button>
+        {title && <div className="video-modal-title">{title}</div>}
+        <div
+          className={`video-modal-iframe-wrapper${isPortrait ? " portrait" : ""}`}
+        >
+          <iframe
+            src={src}
+            frameBorder="0"
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+            title={title}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Work Section ────────────────────────────────────────────────────────────
 
 function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
   const [activeCategory, setActiveCategory] = useState<WorkCategory>("All");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [modalData, setModalData] = useState<{
+    videoId: string;
+    title: string;
+    isPortrait: boolean;
+  } | null>(null);
+
   const videos =
     activeCategory === "All"
       ? ALL_VIDEOS
       : WORK_DATA[activeCategory as Exclude<WorkCategory, "All">];
+
+  const handleMobileTap = useCallback(
+    (videoId: string, title: string, isPortrait: boolean) => {
+      setModalData({ videoId, title, isPortrait });
+    },
+    [],
+  );
 
   return (
     <section
       id="work"
       className="relative py-28 px-6 bg-[oklch(0.06_0_0)] section-grain section-vignette"
     >
-      {/* Background texture */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -1251,8 +1254,6 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
             "radial-gradient(circle at 25% 50%, oklch(0.72 0.12 78) 0%, transparent 60%)",
         }}
       />
-
-      {/* Arcane blob */}
       <ArcaneGlow
         blobs={[
           {
@@ -1266,17 +1267,13 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
           },
         ]}
       />
-
       <div className="max-w-7xl mx-auto">
-        {/* Section label — numbers removed */}
         <div className="reveal flex items-center gap-4 mb-12">
           <div className="gold-divider flex-1 max-w-16" />
           <h2 className="font-display text-4xl md:text-5xl font-bold text-foreground tracking-wide">
             Work
           </h2>
         </div>
-
-        {/* Category tabs */}
         <div className="reveal flex flex-wrap gap-0 mb-12 border-b border-[oklch(0.72_0.12_78/15%)]">
           {WORK_CATEGORIES.map((cat, i) => (
             <button
@@ -1294,10 +1291,7 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
             </button>
           ))}
         </div>
-
-        {/* Video grid */}
         <div className="relative">
-          {/* Subtle dim overlay when a card is hovered on desktop */}
           <AnimatePresence>
             {hoveredIndex !== null && isPointerDevice && (
               <motion.div
@@ -1317,7 +1311,6 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
               />
             )}
           </AnimatePresence>
-
           <AnimatePresence mode="wait">
             <motion.div
               key={activeCategory}
@@ -1329,7 +1322,6 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
             >
               {activeCategory === "All" ? (
                 <>
-                  {/* Row 1 — Vertical / portrait cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {(videos as VideoItemWithCategory[])
                       .slice(0, 3)
@@ -1345,10 +1337,10 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
                           onHoverChange={(hovered) =>
                             setHoveredIndex(hovered ? i : null)
                           }
+                          onMobileTap={handleMobileTap}
                         />
                       ))}
                   </div>
-                  {/* Row 2 — Horizontal / landscape cards */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
                     {(videos as VideoItemWithCategory[])
                       .slice(3)
@@ -1364,6 +1356,7 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
                           onHoverChange={(hovered) =>
                             setHoveredIndex(hovered ? i + 3 : null)
                           }
+                          onMobileTap={handleMobileTap}
                         />
                       ))}
                   </div>
@@ -1380,6 +1373,7 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
                       onHoverChange={(hovered) =>
                         setHoveredIndex(hovered ? i : null)
                       }
+                      onMobileTap={handleMobileTap}
                     />
                   ))}
                 </div>
@@ -1388,6 +1382,14 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
           </AnimatePresence>
         </div>
       </div>
+      {modalData && !isPointerDevice && (
+        <VideoModal
+          videoId={modalData.videoId}
+          title={modalData.title}
+          isPortrait={modalData.isPortrait}
+          onClose={() => setModalData(null)}
+        />
+      )}
     </section>
   );
 }
@@ -1572,19 +1574,24 @@ function ContactSection() {
             {/* Contact details */}
             <div className="space-y-5">
               <a
-                href="mailto:gaureditor@gmail.com"
+                href="https://wa.me/message/56OBAJH3G4QUD1"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-4 group"
-                data-ocid="contact.email.link"
+                data-ocid="contact.whatsapp.link"
               >
                 <div className="w-10 h-10 border border-[oklch(0.72_0.12_78/30%)] flex items-center justify-center group-hover:border-gold group-hover:bg-[oklch(0.72_0.12_78/10%)] transition-all duration-200">
-                  <Mail size={18} className="text-gold" />
+                  <i
+                    className="fab fa-whatsapp text-gold"
+                    style={{ fontSize: "18px" }}
+                  />
                 </div>
                 <div>
                   <p className="font-body text-xs text-muted-foreground tracking-widest uppercase mb-0.5">
-                    Email
+                    WhatsApp
                   </p>
                   <p className="font-body text-sm text-foreground group-hover:text-gold transition-colors duration-200">
-                    gaureditor@gmail.com
+                    Chat on WhatsApp
                   </p>
                 </div>
               </a>
@@ -1605,6 +1612,24 @@ function ContactSection() {
                   </p>
                   <p className="font-body text-sm text-foreground group-hover:text-gold transition-colors duration-200">
                     @gaursesunooo
+                  </p>
+                </div>
+              </a>
+
+              <a
+                href="mailto:gaureditor@gmail.com"
+                className="flex items-center gap-4 group"
+                data-ocid="contact.email.link"
+              >
+                <div className="w-10 h-10 border border-[oklch(0.72_0.12_78/30%)] flex items-center justify-center group-hover:border-gold group-hover:bg-[oklch(0.72_0.12_78/10%)] transition-all duration-200">
+                  <Mail size={18} className="text-gold" />
+                </div>
+                <div>
+                  <p className="font-body text-xs text-muted-foreground tracking-widest uppercase mb-0.5">
+                    Email
+                  </p>
+                  <p className="font-body text-sm text-foreground group-hover:text-gold transition-colors duration-200">
+                    gaureditor@gmail.com
                   </p>
                 </div>
               </a>

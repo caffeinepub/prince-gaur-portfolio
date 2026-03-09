@@ -323,7 +323,10 @@
     background-color: rgba(201, 168, 76, 0.82);
     border: none;
     cursor: pointer;
-    z-index: 10;
+    z-index: 99;
+    pointer-events: all !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
     align-items: center;
     justify-content: center;
     transition: transform 0.2s ease, background-color 0.2s ease;
@@ -346,6 +349,9 @@
   @media (hover: none), (pointer: coarse) {
     .mobile-play-button {
       display: flex !important;
+      z-index: 99 !important;
+      pointer-events: all !important;
+      touch-action: manipulation !important;
     }
   }
 
@@ -993,4 +999,131 @@
     height: 100%;
     border: none;
   }
+}
+
+/* ─── Mobile tap indicator ─── */
+.mobile-tap-indicator {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 99;
+  pointer-events: none;
+}
+.mobile-tap-indicator .tap-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(201, 168, 76, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: white;
+  padding-left: 4px;
+  box-shadow: 0 0 20px rgba(201, 168, 76, 0.4);
+  animation: pulse-gold 2s infinite;
+}
+.mobile-tap-indicator .tap-label {
+  color: #c9a84c;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+@keyframes pulse-gold {
+  0%   { box-shadow: 0 0 0 0 rgba(201,168,76,0.6); }
+  70%  { box-shadow: 0 0 0 14px rgba(201,168,76,0); }
+  100% { box-shadow: 0 0 0 0 rgba(201,168,76,0); }
+}
+@media (min-width: 769px) {
+  .mobile-tap-indicator { display: none !important; }
+}
+
+/* ─── Video Modal ─── */
+.video-modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 99999;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  padding: 20px;
+  box-sizing: border-box;
+}
+.video-modal-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+.video-modal-container {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.video-modal-close {
+  position: absolute;
+  top: -44px;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(201, 168, 76, 0.2);
+  border: 1px solid #c9a84c;
+  color: #c9a84c;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+.video-modal-close:hover,
+.video-modal-close:active {
+  background: rgba(201, 168, 76, 0.5);
+}
+.video-modal-title {
+  color: #c9a84c;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 600;
+  text-align: center;
+}
+.video-modal-iframe-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  height: 0;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(201, 168, 76, 0.15);
+}
+.video-modal-iframe-wrapper.portrait {
+  padding-bottom: 177.78%;
+  max-width: 280px;
+  margin: 0 auto;
+}
+.video-modal-iframe-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
