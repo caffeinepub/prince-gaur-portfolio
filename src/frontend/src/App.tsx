@@ -43,8 +43,9 @@ const WORK_DATA: Record<Exclude<WorkCategory, "All">, VideoItem[]> = {
       title: "YouTube Feature",
     },
     {
-      embedUrl: "https://www.youtube.com/embed/Sf_py4yxc9E",
-      title: "YouTube Short",
+      embedUrl:
+        "https://www.youtube.com/embed/qYQ-ibEhZ44?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=qYQ-ibEhZ44",
+      title: "Youtube Short",
       isShort: true,
     },
   ],
@@ -54,8 +55,10 @@ const WORK_DATA: Record<Exclude<WorkCategory, "All">, VideoItem[]> = {
       title: "Introduction",
     },
     {
-      embedUrl: "https://www.youtube.com/embed/VDnjJzK99-A",
+      embedUrl:
+        "https://www.youtube.com/embed/VDnjJzK99-A?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=VDnjJzK99-A",
       title: "Day-0",
+      isShort: false,
     },
   ],
 };
@@ -66,12 +69,26 @@ interface VideoItemWithCategory extends VideoItem {
 }
 
 const ALL_VIDEOS: VideoItemWithCategory[] = [
-  { ...WORK_DATA.Films[0], category: "Films" },
-  { ...WORK_DATA.Commercial[0], category: "Commercial" },
-  { ...WORK_DATA.YouTube[0], category: "YouTube" },
-  { ...WORK_DATA["Talking Head"][0], category: "Talking Head" },
-  { ...WORK_DATA.Commercial[1], category: "Commercial" },
-  { ...WORK_DATA["Talking Head"][1], category: "Talking Head" },
+  // ROW 1 — Vertical cards (9:16 portrait)
+  { ...WORK_DATA.Commercial[0], category: "Commercial" }, // Urban Company, isShort: true
+  { ...WORK_DATA.Commercial[1], category: "Commercial" }, // Hoopr, isShort: true
+  {
+    embedUrl:
+      "https://www.youtube.com/embed/qYQ-ibEhZ44?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=qYQ-ibEhZ44",
+    title: "Youtube Short",
+    isShort: true,
+    category: "YouTube",
+  },
+  // ROW 2 — Horizontal cards (16:9 landscape)
+  { ...WORK_DATA.YouTube[0], category: "YouTube" }, // YouTube Feature
+  { ...WORK_DATA.Films[0], category: "Films" }, // WokTok
+  {
+    embedUrl:
+      "https://www.youtube.com/embed/VDnjJzK99-A?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=VDnjJzK99-A",
+    title: "Day-0",
+    isShort: false,
+    category: "Talking Head",
+  },
 ];
 
 const WORK_CATEGORIES: WorkCategory[] = [
@@ -578,10 +595,10 @@ function Navigation() {
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="font-display text-2xl font-bold text-gold tracking-widest"
+          className="nav-logo-text"
           data-ocid="nav.button"
         >
-          PG
+          Prince Gaur
         </button>
 
         {/* Nav links */}
@@ -919,7 +936,7 @@ function AboutSection() {
   );
 }
 
-// ─── Video Card (Cinematic expand-in-place hover preview) ─────────────────────
+// ─── Video Card (Desktop: zoom-out hover preview | Mobile: scroll IntersectionObserver) ──
 
 interface VideoCardProps {
   video: VideoItem | VideoItemWithCategory;
@@ -929,6 +946,12 @@ interface VideoCardProps {
   onHoverChange?: (hovered: boolean) => void;
 }
 
+// Detect pointer device once (desktop = hover:hover + pointer:fine)
+const isPointerDevice =
+  typeof window !== "undefined"
+    ? window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    : true;
+
 function VideoCard({
   video,
   displayCategory,
@@ -937,13 +960,14 @@ function VideoCard({
   onHoverChange,
 }: VideoCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasBeenHoveredRef = useRef(false);
   const videoId = extractVideoId(video.embedUrl);
   const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
-  // Start muted (required for autoplay), then unmute via postMessage after a short delay
+  // Iframe src — always muted initially, unmuted via postMessage after hover
   const previewSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
 
   // Send YouTube IFrame API command via postMessage
@@ -954,7 +978,9 @@ function VideoCard({
     );
   }, []);
 
+  // ── Desktop hover handlers (pointer devices only) ─────────────────
   const handleHoverStart = useCallback(() => {
+    if (!isPointerDevice) return;
     const firstHover = !hasBeenHoveredRef.current;
     hasBeenHoveredRef.current = true;
     setIsHovered(true);
@@ -980,6 +1006,7 @@ function VideoCard({
   }, [postYT, audioEnabled, onHoverChange]);
 
   const handleHoverEnd = useCallback(() => {
+    if (!isPointerDevice) return;
     setIsHovered(false);
     onHoverChange?.(false);
     if (unmuteTimerRef.current) {
@@ -991,6 +1018,41 @@ function VideoCard({
     postYT("seekTo", [0, true]);
   }, [postYT, onHoverChange]);
 
+  // ── Mobile: IntersectionObserver scroll-play ──────────────────────
+  useEffect(() => {
+    if (isPointerDevice) return; // desktop uses hover, not observer
+    const card = cardRef.current;
+    if (!card) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            postYT("playVideo");
+          } else {
+            postYT("pauseVideo");
+            postYT("seekTo", [0, true]);
+          }
+        }
+      },
+      { threshold: 0.5 },
+    );
+
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [postYT]);
+
+  // ── Pause on tab hidden ───────────────────────────────────────────
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden) {
+        postYT("pauseVideo");
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [postYT]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -998,15 +1060,14 @@ function VideoCard({
     };
   }, []);
 
-  // Keep iframe in DOM once it has been hovered (for instant re-hover)
-  const showIframe = isHovered || hasBeenHoveredRef.current;
-
-  // Expand scale: ~60% wider than card = scale 1.55 for regular, 1.4 for shorts
-  const expandScale = video.isShort ? 1.4 : 1.55;
+  // Keep iframe in DOM once it has been hovered (for instant re-hover on desktop)
+  // On mobile, always show iframe so IntersectionObserver can control it
+  const showIframe = !isPointerDevice || isHovered || hasBeenHoveredRef.current;
 
   return (
     <motion.div
-      className="gold-card bg-card overflow-visible group"
+      ref={cardRef}
+      className={`portfolio-card gold-card bg-card overflow-hidden group${isHovered ? " is-desktop-hovered" : ""}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -1016,104 +1077,89 @@ function VideoCard({
       style={{
         borderRadius: "4px",
         position: "relative",
-        zIndex: isHovered ? 50 : 1,
-        transition: "z-index 0s",
+        zIndex: isHovered ? 10 : 1,
+        willChange: "transform",
       }}
     >
-      {/* Inner wrapper — this is what scales up */}
-      <motion.div
-        animate={isHovered ? { scale: expandScale, y: -8 } : { scale: 1, y: 0 }}
-        transition={{
-          duration: 0.42,
-          ease: [0.25, 0.46, 0.45, 0.94],
-        }}
+      {/* Video area */}
+      <div
+        className={`video-container${video.isShort ? " shorts" : ""} video-card-wrapper${isHovered ? " is-hovered" : ""}`}
+      >
+        {/* Thumbnail */}
+        <img
+          src={thumbnailUrl}
+          alt={video.title}
+          className="video-thumbnail"
+          loading="lazy"
+        />
+
+        {/* Card overlay — visible on mobile (0.4), fades on desktop hover */}
+        <div
+          className="card-overlay"
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(to top, oklch(0 0 0 / 65%) 0%, oklch(0 0 0 / 30%) 50%, transparent 100%)",
+            pointerEvents: "none",
+            zIndex: 2,
+            opacity: isHovered ? 0.3 : 0.7,
+            transition: "opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+          }}
+        />
+
+        {/* iframe preview */}
+        {showIframe && (
+          <iframe
+            ref={iframeRef}
+            className="video-iframe-preview"
+            src={previewSrc}
+            title={`${video.title} preview`}
+            frameBorder={0}
+            allow="autoplay; encrypted-media; accelerometer; clipboard-write; gyroscope; picture-in-picture"
+            allowFullScreen
+            loading="lazy"
+            style={{
+              opacity: isHovered || !isPointerDevice ? 1 : 0,
+              pointerEvents: "none",
+              transition: "opacity 0.35s ease",
+            }}
+          />
+        )}
+      </div>
+
+      {/* Card footer */}
+      <div
+        className="px-4 py-3 border-t border-[oklch(0.72_0.12_78/12%)] flex items-center justify-between"
         style={{
-          borderRadius: "4px",
-          overflow: "hidden",
-          transformOrigin: "center center",
-          boxShadow: isHovered
-            ? "0 0 0 1px oklch(0.72 0.12 78 / 55%), 0 20px 60px oklch(0 0 0 / 85%), 0 0 40px oklch(0.72 0.12 78 / 30%), 0 0 100px oklch(0.72 0.12 78 / 12%)"
-            : "0 4px 20px oklch(0 0 0 / 30%)",
-          transition: "box-shadow 0.35s ease",
-          willChange: "transform",
+          background:
+            "linear-gradient(to right, oklch(0.13 0.006 78 / 80%), oklch(0.11 0 0))",
         }}
       >
-        {/* Video area */}
-        <div
-          className={`video-container${video.isShort ? " shorts" : ""} video-card-wrapper${isHovered ? " is-hovered" : ""}`}
-        >
-          {/* Thumbnail */}
-          <img
-            src={thumbnailUrl}
-            alt={video.title}
-            className="video-thumbnail"
-            loading="lazy"
-          />
-
-          {/* Hover iframe preview — kept in DOM after first hover for instant re-play */}
-          {showIframe && (
-            <iframe
-              ref={iframeRef}
-              className="video-iframe-preview"
-              src={previewSrc}
-              title={`${video.title} preview`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{
-                opacity: isHovered ? 1 : 0,
-                pointerEvents: isHovered ? "auto" : "none",
-              }}
-            />
-          )}
-
-          {/* Cinematic overlay gradient on hover */}
-          {isHovered && (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background:
-                  "linear-gradient(to top, oklch(0 0 0 / 60%) 0%, transparent 40%)",
-                pointerEvents: "none",
-                zIndex: 2,
-              }}
-            />
-          )}
-        </div>
-
-        {/* Card footer */}
-        <div
-          className="px-4 py-3 border-t border-[oklch(0.72_0.12_78/12%)] flex items-center justify-between"
-          style={{
-            background:
-              "linear-gradient(to right, oklch(0.13 0.006 78 / 80%), oklch(0.11 0 0))",
-          }}
-        >
-          <div>
-            <p
-              className="font-body text-sm font-medium tracking-wide transition-all duration-300"
-              style={{
-                color: isHovered
-                  ? "oklch(0.72 0.12 78)"
-                  : "oklch(0.94 0.012 85 / 85%)",
-                transform: isHovered ? "translateY(-2px)" : "translateY(0)",
-              }}
-            >
-              {video.title}
-            </p>
-            <p className="font-body text-xs text-muted-foreground mt-0.5 tracking-[0.2em] uppercase">
-              {displayCategory}
-            </p>
-          </div>
-          {/* Gold arrow indicator on hover */}
-          <span
-            className="text-gold text-lg leading-none transition-opacity duration-300"
-            style={{ opacity: isHovered ? 1 : 0 }}
+        <div>
+          <p
+            className="font-body text-sm font-medium tracking-wide transition-all duration-300"
+            style={{
+              color: isHovered
+                ? "oklch(0.72 0.12 78)"
+                : "oklch(0.94 0.012 85 / 85%)",
+              transform: isHovered ? "translateY(-2px)" : "translateY(0)",
+            }}
           >
-            ›
-          </span>
+            {video.title}
+          </p>
+          <p className="font-body text-xs text-muted-foreground mt-0.5 tracking-[0.2em] uppercase">
+            {displayCategory}
+          </p>
         </div>
-      </motion.div>
+        {/* Gold arrow indicator on hover */}
+        <span
+          className="text-gold text-lg leading-none transition-opacity duration-300"
+          style={{ opacity: isHovered ? 1 : 0 }}
+        >
+          ›
+        </span>
+      </div>
     </motion.div>
   );
 }
@@ -1185,11 +1231,11 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
           ))}
         </div>
 
-        {/* Video grid — relative container for dimming overlay */}
+        {/* Video grid */}
         <div className="relative">
-          {/* Cinematic dim overlay when any card is hovered */}
+          {/* Subtle dim overlay when a card is hovered on desktop */}
           <AnimatePresence>
-            {hoveredIndex !== null && (
+            {hoveredIndex !== null && isPointerDevice && (
               <motion.div
                 key="dim-overlay"
                 initial={{ opacity: 0 }}
@@ -1199,9 +1245,8 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
                 style={{
                   position: "absolute",
                   inset: "-3rem",
-                  background: "oklch(0 0 0 / 55%)",
-                  backdropFilter: "blur(2px)",
-                  zIndex: 10,
+                  background: "oklch(0 0 0 / 35%)",
+                  zIndex: 5,
                   pointerEvents: "none",
                   borderRadius: "8px",
                 }}
@@ -1216,25 +1261,65 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
               style={{ position: "relative" }}
             >
-              {videos.map((video, i) => (
-                <VideoCard
-                  key={`${activeCategory}-${video.embedUrl}-${i}`}
-                  video={video}
-                  displayCategory={
-                    activeCategory === "All"
-                      ? (video as VideoItemWithCategory).category
-                      : activeCategory
-                  }
-                  index={i}
-                  audioEnabled={audioEnabled}
-                  onHoverChange={(hovered) =>
-                    setHoveredIndex(hovered ? i : null)
-                  }
-                />
-              ))}
+              {activeCategory === "All" ? (
+                <>
+                  {/* Row 1 — Vertical / portrait cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {(videos as VideoItemWithCategory[])
+                      .slice(0, 3)
+                      .map((video, i) => (
+                        <VideoCard
+                          key={`${activeCategory}-${video.embedUrl}-${i}`}
+                          video={video}
+                          displayCategory={
+                            (video as VideoItemWithCategory).category
+                          }
+                          index={i}
+                          audioEnabled={audioEnabled}
+                          onHoverChange={(hovered) =>
+                            setHoveredIndex(hovered ? i : null)
+                          }
+                        />
+                      ))}
+                  </div>
+                  {/* Row 2 — Horizontal / landscape cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                    {(videos as VideoItemWithCategory[])
+                      .slice(3)
+                      .map((video, i) => (
+                        <VideoCard
+                          key={`${activeCategory}-${video.embedUrl}-${i + 3}`}
+                          video={video}
+                          displayCategory={
+                            (video as VideoItemWithCategory).category
+                          }
+                          index={i + 3}
+                          audioEnabled={audioEnabled}
+                          onHoverChange={(hovered) =>
+                            setHoveredIndex(hovered ? i + 3 : null)
+                          }
+                        />
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {videos.map((video, i) => (
+                    <VideoCard
+                      key={`${activeCategory}-${video.embedUrl}-${i}`}
+                      video={video}
+                      displayCategory={activeCategory}
+                      index={i}
+                      audioEnabled={audioEnabled}
+                      onHoverChange={(hovered) =>
+                        setHoveredIndex(hovered ? i : null)
+                      }
+                    />
+                  ))}
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -1599,8 +1684,8 @@ function Footer() {
     <footer className="relative py-10 px-6 border-t border-[oklch(0.72_0.12_78/15%)]">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Logo */}
-        <span className="font-display text-xl font-bold text-gold tracking-widest">
-          PG
+        <span className="nav-logo-text" style={{ fontSize: "1.1rem" }}>
+          Prince Gaur
         </span>
 
         {/* Copyright */}
