@@ -1157,7 +1157,7 @@ interface VideoModalProps {
 }
 
 function VideoModal({ videoId, title, isPortrait, onClose }: VideoModalProps) {
-  const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&controls=1&playsinline=1&playlist=${videoId}&enablejsapi=1&rel=0`;
+  const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&controls=0&playsinline=1&playlist=${videoId}&enablejsapi=1&rel=0`;
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
