@@ -1004,9 +1004,9 @@
 /* ─── Mobile tap indicator ─── */
 .mobile-tap-indicator {
   position: absolute;
-  bottom: 16px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1015,17 +1015,16 @@
   pointer-events: none;
 }
 .mobile-tap-indicator .tap-icon {
-  width: 56px;
-  height: 56px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
-  background: rgba(201, 168, 76, 0.85);
+  background: rgba(201, 168, 76, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  color: white;
-  padding-left: 4px;
-  box-shadow: 0 0 20px rgba(201, 168, 76, 0.4);
+  font-size: 32px;
+  color: #0a0a0a;
+  padding-left: 5px;
   animation: pulse-gold 2s infinite;
 }
 .mobile-tap-indicator .tap-label {
@@ -1036,8 +1035,8 @@
   font-weight: 600;
 }
 @keyframes pulse-gold {
-  0%   { box-shadow: 0 0 0 0 rgba(201,168,76,0.6); }
-  70%  { box-shadow: 0 0 0 14px rgba(201,168,76,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(201,168,76,0.7); }
+  70%  { box-shadow: 0 0 0 20px rgba(201,168,76,0); }
   100% { box-shadow: 0 0 0 0 rgba(201,168,76,0); }
 }
 @media (min-width: 769px) {

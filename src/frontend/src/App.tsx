@@ -27,7 +27,7 @@ const WORK_DATA: Record<Exclude<WorkCategory, "All">, VideoItem[]> = {
   ],
   Commercial: [
     {
-      embedUrl: "https://www.youtube.com/embed/s45E_oVnbNA",
+      embedUrl: "https://player.vimeo.com/video/1172184801",
       title: "Urban Company",
       isShort: true,
     },
@@ -69,17 +69,7 @@ interface VideoItemWithCategory extends VideoItem {
 }
 
 const ALL_VIDEOS: VideoItemWithCategory[] = [
-  // ROW 1 — Vertical cards (9:16 portrait)
-  { ...WORK_DATA.Commercial[0], category: "Commercial" }, // Urban Company, isShort: true
-  { ...WORK_DATA.Commercial[1], category: "Commercial" }, // Hoopr, isShort: true
-  {
-    embedUrl:
-      "https://www.youtube.com/embed/qYQ-ibEhZ44?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=qYQ-ibEhZ44",
-    title: "Youtube Short",
-    isShort: true,
-    category: "YouTube",
-  },
-  // ROW 2 — Horizontal cards (16:9 landscape)
+  // ROW 1 — Horizontal cards (16:9 landscape)
   { ...WORK_DATA.YouTube[0], category: "YouTube" }, // YouTube Feature
   { ...WORK_DATA.Films[0], category: "Films" }, // WokTok
   {
@@ -88,6 +78,16 @@ const ALL_VIDEOS: VideoItemWithCategory[] = [
     title: "Day-0",
     isShort: false,
     category: "Talking Head",
+  },
+  // ROW 2 — Vertical cards (9:16 portrait)
+  { ...WORK_DATA.Commercial[0], category: "Commercial" }, // Urban Company, isShort: true
+  { ...WORK_DATA.Commercial[1], category: "Commercial" }, // Hoopr, isShort: true
+  {
+    embedUrl:
+      "https://www.youtube.com/embed/qYQ-ibEhZ44?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=qYQ-ibEhZ44",
+    title: "Youtube Short",
+    isShort: true,
+    category: "YouTube",
   },
 ];
 
@@ -131,8 +131,17 @@ const TESTIMONIALS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function isVimeoEmbed(embedUrl: string): boolean {
+  return embedUrl.includes("vimeo.com");
+}
+
 function extractVideoId(embedUrl: string): string {
-  // Extract video ID from URLs like https://www.youtube.com/embed/VIDEO_ID
+  // Vimeo: https://player.vimeo.com/video/VIDEO_ID
+  if (isVimeoEmbed(embedUrl)) {
+    const match = embedUrl.match(/vimeo\.com\/video\/(\d+)/);
+    return match ? match[1] : "";
+  }
+  // YouTube: https://www.youtube.com/embed/VIDEO_ID
   const parts = embedUrl.split("/embed/");
   if (parts.length > 1) {
     return parts[1].split("?")[0];
@@ -953,7 +962,7 @@ interface VideoCardProps {
   index: number;
   audioEnabled: boolean;
   onHoverChange?: (hovered: boolean) => void;
-  onMobileTap?: (videoId: string, title: string, isPortrait: boolean) => void;
+  onMobileTap?: (embedUrl: string, title: string, isPortrait: boolean) => void;
 }
 
 // Detect pointer device once (desktop = hover:hover + pointer:fine)
@@ -976,9 +985,14 @@ function VideoCard({
   const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasBeenHoveredRef = useRef(false);
   const videoId = extractVideoId(video.embedUrl);
-  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  const isVimeo = isVimeoEmbed(video.embedUrl);
+  const thumbnailUrl = isVimeo
+    ? ""
+    : `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
-  const previewSrc = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
+  const previewSrc = isVimeo
+    ? `https://player.vimeo.com/video/${videoId}?autoplay=1&muted=1&loop=1&background=1`
+    : `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
 
   const postYT = useCallback((command: string, args: unknown[] = []) => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -1056,7 +1070,7 @@ function VideoCard({
       onHoverEnd={handleHoverEnd}
       onClick={() => {
         if (!isPointerDevice) {
-          onMobileTap?.(videoId, video.title, video.isShort === true);
+          onMobileTap?.(video.embedUrl, video.title, video.isShort === true);
         }
       }}
       data-ocid={`work.item.${index + 1}` as `work.item.${1 | 2 | 3}`}
@@ -1150,14 +1164,18 @@ function VideoCard({
 // ─── Video Modal (Mobile only) ────────────────────────────────────────────────
 
 interface VideoModalProps {
-  videoId: string;
+  embedUrl: string;
   title: string;
   isPortrait: boolean;
   onClose: () => void;
 }
 
-function VideoModal({ videoId, title, isPortrait, onClose }: VideoModalProps) {
-  const src = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&controls=0&playsinline=1&playlist=${videoId}&enablejsapi=1&rel=0`;
+function VideoModal({ embedUrl, title, isPortrait, onClose }: VideoModalProps) {
+  const videoId = extractVideoId(embedUrl);
+  const isVimeo = isVimeoEmbed(embedUrl);
+  const src = isVimeo
+    ? `https://player.vimeo.com/video/${videoId}?autoplay=1&muted=0&loop=1&autopause=0&playsinline=1`
+    : `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&loop=1&controls=0&playsinline=1&playlist=${videoId}&enablejsapi=1&rel=0`;
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -1209,7 +1227,7 @@ function VideoModal({ videoId, title, isPortrait, onClose }: VideoModalProps) {
           <iframe
             src={src}
             frameBorder="0"
-            allow="autoplay; encrypted-media; fullscreen"
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
             allowFullScreen
             title={title}
           />
@@ -1225,7 +1243,7 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
   const [activeCategory, setActiveCategory] = useState<WorkCategory>("All");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [modalData, setModalData] = useState<{
-    videoId: string;
+    embedUrl: string;
     title: string;
     isPortrait: boolean;
   } | null>(null);
@@ -1236,8 +1254,8 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
       : WORK_DATA[activeCategory as Exclude<WorkCategory, "All">];
 
   const handleMobileTap = useCallback(
-    (videoId: string, title: string, isPortrait: boolean) => {
-      setModalData({ videoId, title, isPortrait });
+    (embedUrl: string, title: string, isPortrait: boolean) => {
+      setModalData({ embedUrl, title, isPortrait });
     },
     [],
   );
@@ -1384,7 +1402,7 @@ function WorkSection({ audioEnabled }: { audioEnabled: boolean }) {
       </div>
       {modalData && !isPointerDevice && (
         <VideoModal
-          videoId={modalData.videoId}
+          embedUrl={modalData.embedUrl}
           title={modalData.title}
           isPortrait={modalData.isPortrait}
           onClose={() => setModalData(null)}
