@@ -71,7 +71,7 @@ const WORK_DATA: Record<Exclude<WorkCategory, "All">, VideoItem[]> = {
   AI: [
     {
       embedUrl:
-        "https://www.youtube.com/embed/QS-0ezAXO0I?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=QS-0ezAXO0I&enablejsapi=1",
+        "https://www.youtube.com/embed/DdJgrF5jmfw?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=DdJgrF5jmfw&enablejsapi=1",
       title: "Cynthia",
       isShort: true,
     },
@@ -105,7 +105,7 @@ const ALL_VIDEOS: VideoItemWithCategory[] = [
   { ...WORK_DATA.Commercial[1], category: "Commercial" }, // Hoopr, isShort: true
   {
     embedUrl:
-      "https://www.youtube.com/embed/QS-0ezAXO0I?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=QS-0ezAXO0I&enablejsapi=1",
+      "https://www.youtube.com/embed/DdJgrF5jmfw?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=DdJgrF5jmfw&enablejsapi=1",
     title: "Cynthia",
     isShort: true,
     category: "AI",
