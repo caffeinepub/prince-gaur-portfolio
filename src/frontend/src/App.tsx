@@ -8,7 +8,13 @@ import { useActor } from "./hooks/useActor";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type WorkCategory = "All" | "Films" | "Commercial" | "YouTube" | "Talking Head";
+type WorkCategory =
+  | "All"
+  | "Films"
+  | "Commercial"
+  | "YouTube"
+  | "Talking Head"
+  | "AI";
 
 interface VideoItem {
   embedUrl: string;
@@ -61,6 +67,18 @@ const WORK_DATA: Record<Exclude<WorkCategory, "All">, VideoItem[]> = {
       isShort: false,
     },
   ],
+  AI: [
+    {
+      embedUrl: "https://player.vimeo.com/video/1175820072",
+      title: "Cynthia",
+      isShort: true,
+    },
+    {
+      embedUrl: "https://player.vimeo.com/video/1175820428",
+      title: "Ceramic",
+      isShort: true,
+    },
+  ],
 };
 
 // All category: 6 videos mixed from different categories (with category label)
@@ -83,11 +101,10 @@ const ALL_VIDEOS: VideoItemWithCategory[] = [
   { ...WORK_DATA.Commercial[0], category: "Commercial" }, // Urban Company, isShort: true
   { ...WORK_DATA.Commercial[1], category: "Commercial" }, // Hoopr, isShort: true
   {
-    embedUrl:
-      "https://www.youtube.com/embed/qYQ-ibEhZ44?autoplay=1&mute=1&loop=1&controls=0&playsinline=1&playlist=qYQ-ibEhZ44",
-    title: "Youtube Short",
+    embedUrl: "https://player.vimeo.com/video/1175820072",
+    title: "Cynthia",
     isShort: true,
-    category: "YouTube",
+    category: "AI",
   },
 ];
 
@@ -97,6 +114,7 @@ const WORK_CATEGORIES: WorkCategory[] = [
   "Commercial",
   "YouTube",
   "Talking Head",
+  "AI",
 ];
 
 const SKILLS = [
