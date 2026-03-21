@@ -33,7 +33,8 @@ const WORK_DATA: Record<Exclude<WorkCategory, "All">, VideoItem[]> = {
   ],
   Commercial: [
     {
-      embedUrl: "https://player.vimeo.com/video/1175822509",
+      embedUrl:
+        "https://www.youtube.com/embed/3UbV8tCg88Y?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=3UbV8tCg88Y&enablejsapi=1",
       title: "Urban Company",
       isShort: true,
     },
@@ -69,12 +70,14 @@ const WORK_DATA: Record<Exclude<WorkCategory, "All">, VideoItem[]> = {
   ],
   AI: [
     {
-      embedUrl: "https://player.vimeo.com/video/1175820072",
+      embedUrl:
+        "https://www.youtube.com/embed/QS-0ezAXO0I?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=QS-0ezAXO0I&enablejsapi=1",
       title: "Cynthia",
       isShort: true,
     },
     {
-      embedUrl: "https://player.vimeo.com/video/1175820428",
+      embedUrl:
+        "https://www.youtube.com/embed/C7ebviDzbj4?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=C7ebviDzbj4&enablejsapi=1",
       title: "Ceramic",
       isShort: true,
     },
@@ -101,7 +104,8 @@ const ALL_VIDEOS: VideoItemWithCategory[] = [
   { ...WORK_DATA.Commercial[0], category: "Commercial" }, // Urban Company, isShort: true
   { ...WORK_DATA.Commercial[1], category: "Commercial" }, // Hoopr, isShort: true
   {
-    embedUrl: "https://player.vimeo.com/video/1175820072",
+    embedUrl:
+      "https://www.youtube.com/embed/QS-0ezAXO0I?autoplay=0&mute=1&loop=1&controls=0&playsinline=1&playlist=QS-0ezAXO0I&enablejsapi=1",
     title: "Cynthia",
     isShort: true,
     category: "AI",
