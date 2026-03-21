@@ -384,6 +384,10 @@
     transition: opacity 0.3s ease, transform 0.35s ease;
   }
 
+  .video-card-wrapper .video-thumbnail.vimeo-thumbnail {
+    object-fit: contain;
+    background-color: #000;
+  }
   .video-card-wrapper .video-iframe-preview {
     position: absolute;
     top: 0;

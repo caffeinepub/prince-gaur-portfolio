@@ -1005,7 +1005,7 @@ function VideoCard({
   const videoId = extractVideoId(video.embedUrl);
   const isVimeo = isVimeoEmbed(video.embedUrl);
   const thumbnailUrl = isVimeo
-    ? ""
+    ? `https://vumbnail.com/${videoId}.jpg`
     : `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
   const previewSrc = isVimeo
@@ -1105,7 +1105,7 @@ function VideoCard({
         <img
           src={thumbnailUrl}
           alt={video.title}
-          className="video-thumbnail"
+          className={`video-thumbnail${isVimeo ? " vimeo-thumbnail" : ""}`}
           loading="lazy"
         />
         <div
